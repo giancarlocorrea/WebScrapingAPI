@@ -23,10 +23,12 @@ async function iniciaScraper() {
   // Inicia uma instância de um novo navegador
   const browser = await browserPromise;
 
-  let oportunidades = [];
+  let oportunidades = DataService.Oportunidades();
 
   // Cria uma nova página
   pagina = await browser.newPage();
+
+  var startTime = new Date();
 
   await pagina.goto(url);
 
@@ -35,12 +37,9 @@ async function iniciaScraper() {
 
   // Pega todas as licitações
   let urls = await pagina.$$eval(".item-lista > li", (links) => {
-    // let titulo = links.map((el) => el.querySelector("h3 > a").textContent);
-    // //console.log(existeLicitacao(titulo));
     //
     // Extrai os links baseado no seletor
-    links = links.map((el) => el.querySelector("h3 > a").href);
-    return links;
+    return links.map((el) => el.querySelector("h3 > a").href);
   });
 
   // Faz um loop para cada link, abre uma nova página e pega os dados relevantes
@@ -52,30 +51,54 @@ async function iniciaScraper() {
       const novaPagina = await browser.newPage();
       await novaPagina.goto(link);
 
-      // Atribui valores para cada elemento do objeto
-      dataObj["id"] =
-        oportunidades.length === 0
-          ? 1
-          : oportunidades[oportunidades.length - 1].id + 1;
-
-      dataObj["licitacao"] = await novaPagina.$eval(
+      let atual = await novaPagina.$eval(
         ".licitacoes.detalhes > h2",
         (licitacao) => licitacao.textContent
       );
-      dataObj["status"] = await novaPagina.$eval(
-        ".licitacoes.detalhes > .status",
-        (status) => status.textContent
+
+      const encontrouLicitacao = oportunidades.find(
+        (oportunidade) => oportunidade.licitacao === atual
       );
 
-      dataObj["objeto"] = await novaPagina.$eval(
-        ".info-basicas > .objeto",
-        (objeto) => objeto.textContent
-      );
+      if (!encontrouLicitacao) {
+        //
+        // Atribui valores para cada elemento do objeto
+        dataObj["id"] =
+          oportunidades.length === 0
+            ? 1
+            : oportunidades[oportunidades.length - 1].id + 1;
 
-      dataObj["lida"] = "N";
+        dataObj["licitacao"] = await novaPagina.$eval(
+          ".licitacoes.detalhes > h2",
+          (licitacao) => licitacao.textContent
+        );
+        dataObj["status"] = await novaPagina.$eval(
+          ".licitacoes.detalhes > .status",
+          (status) => status.textContent
+        );
 
-      // Retorna o objeto da promise
-      resolve(dataObj);
+        dataObj["objeto"] = await novaPagina.$eval(
+          ".info-basicas > .objeto",
+          (objeto) => objeto.textContent
+        );
+
+        dataObj["data"] = await novaPagina.$eval(
+          ".info-basicas .data",
+          (objeto) => {
+            let _data = `${objeto.children[1].textContent}/
+          ${objeto.children[2].textContent}/
+          ${objeto.children[3].textContent}`;
+            return _data.replaceAll(/^\s+|\s+|\n+$/gm, "");
+          }
+        );
+
+        dataObj["lida"] = "N";
+
+        // Retorna o objeto da promise
+        resolve(dataObj);
+      } else {
+        resolve(0);
+      }
 
       await novaPagina.close();
     });
@@ -83,14 +106,18 @@ async function iniciaScraper() {
   // Percorre a lista de links e seleciona os valores dos elementos
   for (link in urls) {
     let itemOportunidades = await paginaPromise(urls[link]);
-    oportunidades.push(itemOportunidades);
+    if (itemOportunidades !== 0) {
+      oportunidades.push(itemOportunidades);
+    }
   }
 
-  DataService.gravaArquivo(oportunidades, "oportunidades.json");
-
   await pagina.close();
-
   await browser.close();
+  var endTime = new Date();
+  var seconds = (endTime.getTime() - startTime.getTime()) / 1000;
+  console.log("Tempo de execução: " + seconds);
+  console.log("Os dados foram extraídos com sucesso");
+  DataService.gravaArquivo(oportunidades, "oportunidades.json");
 
   return oportunidades;
 }

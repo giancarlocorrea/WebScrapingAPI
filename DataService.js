@@ -13,9 +13,7 @@ const DataService = {
       (oportunidade) => Number(oportunidade.id) === Number(id_oportunidade)
     );
 
-    if (!oportunidade) {
-      return "Oportunidade não encontrada";
-    }
+    if (!oportunidade) return "Oportunidade não encontrada";
 
     const atualizaOportunidade = {
       id,
@@ -47,9 +45,7 @@ const DataService = {
       if (err) {
         return console.log(err);
       }
-      console.log(
-        `Os dados foram extraídos e salvos com sucesso no arquivo ${arquivo}`
-      );
+      console.log(`Os dados foram salvos no arquivo ${arquivo}`);
     });
   },
 };
